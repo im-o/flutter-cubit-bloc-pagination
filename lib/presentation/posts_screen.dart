@@ -1,13 +1,28 @@
+import 'dart:async';
+
 import 'package:cubit_bloc_pagination/cubit/posts/posts_cubit.dart';
 import 'package:cubit_bloc_pagination/data/models/post.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter_bloc/flutter_bloc.dart';
 
 class PostView extends StatelessWidget {
-  const PostView({Key? key}) : super(key: key);
+  final scrollController = ScrollController();
+
+  PostView({Key? key}) : super(key: key);
+
+  void setupScrollController(context) {
+    scrollController.addListener(() {
+      if (scrollController.position.atEdge) {
+        if (scrollController.position.pixels != 0) {
+          BlocProvider.of<PostsCubit>(context).loadPosts();
+        }
+      }
+    });
+  }
 
   @override
   Widget build(BuildContext context) {
+    setupScrollController(context);
     BlocProvider.of<PostsCubit>(context).loadPosts();
 
     return Scaffold(
@@ -23,22 +38,34 @@ class PostView extends StatelessWidget {
       }
 
       List<Post> posts = [];
+      bool isLoading = false;
+
       if (state is PostsLoading) {
         posts = state.oldPosts;
+        isLoading = true;
       } else if (state is PostsLoaded) {
         posts = state.posts;
       }
 
       return ListView.separated(
+        controller: scrollController,
         itemBuilder: (context, index) {
-          return _post(posts[index], context);
+          if (index < posts.length)
+            return _post(posts[index], context);
+          else {
+            Timer(
+                Duration(milliseconds: 50),
+                () => scrollController
+                    .jumpTo(scrollController.position.maxScrollExtent));
+            return _loadingIndicator();
+          }
         },
         separatorBuilder: (context, index) {
           return Divider(
             color: Colors.grey[400],
           );
         },
-        itemCount: posts.length,
+        itemCount: posts.length + (isLoading ? 1 : 0),
       );
     });
   }
